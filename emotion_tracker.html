@@ -1,0 +1,142 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>하루 감정 기록</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background: #fefaf4;
+      color: #333;
+      text-align: center;
+      padding: 30px;
+    }
+    h1 { font-size: 24px; color: #444; }
+    .buttons, .reset-btn { margin: 20px 0; }
+    button {
+      margin: 5px; padding: 10px 15px;
+      font-size: 16px; border: none;
+      border-radius: 6px; background-color: #ffe0b2;
+      cursor: pointer;
+    }
+    button:hover { background-color: #ffd180; }
+    .reset-btn { background-color: #ffbdbd; }
+    #stats, #history, #monthly-chart-container {
+      margin-top: 30px;
+      font-size: 18px;
+    }
+    canvas { max-width: 100%; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>오늘 하루 감정을 숫자로 기록해요</h1>
+  <p>1 (매우 안 좋음) ~ 10 (매우 좋음)</p>
+
+  <div class="buttons" id="emotionButtons"></div>
+
+  <div id="stats">
+    <p>총 기록 수: <span id="count">0</span></p>
+    <p>평균 감정 점수: <span id="average">0</span></p>
+  </div>
+
+  <div id="history">
+    <h3>📅 최근 7일 감정 기록</h3>
+    <ul id="historyList"></ul>
+  </div>
+
+  <div id="monthly-chart-container">
+    <h3>📈 이번 달 감정 변화</h3>
+    <canvas id="emotionChart" height="200"></canvas>
+  </div>
+
+  <button class="reset-btn" onclick="resetData()">기록 초기화</button>
+
+  <script>
+    const buttonContainer = document.getElementById("emotionButtons");
+    const countDisplay = document.getElementById("count");
+    const averageDisplay = document.getElementById("average");
+    const historyList = document.getElementById("historyList");
+    const ctx = document.getElementById('emotionChart').getContext('2d');
+
+    let chart = null;
+
+    for (let i = 1; i <= 10; i++) {
+      const btn = document.createElement("button");
+      btn.textContent = i;
+      btn.addEventListener("click", () => recordEmotion(i));
+      buttonContainer.appendChild(btn);
+    }
+
+    function getTodayDate() {
+      return new Date().toISOString().split("T")[0];
+    }
+
+    function recordEmotion(score) {
+      const data = JSON.parse(localStorage.getItem("emotionData")) || {};
+      const today = getTodayDate();
+      data[today] = score;
+      localStorage.setItem("emotionData", JSON.stringify(data));
+      updateStats(data);
+    }
+
+    function updateStats(data) {
+      const dates = Object.keys(data).sort();
+      const values = dates.map(d => Number(data[d]));
+      const total = values.reduce((a, b) => a + b, 0);
+      const average = (total / values.length).toFixed(2);
+      countDisplay.textContent = values.length;
+      averageDisplay.textContent = isNaN(average) ? 0 : average;
+
+      // 최근 7일 출력
+      historyList.innerHTML = '';
+      const recent = dates.slice(-7);
+      recent.forEach(date => {
+        const li = document.createElement('li');
+        li.textContent = `${date} - 감정 점수: ${data[date]}`;
+        historyList.appendChild(li);
+      });
+
+      // 이번 달 감정 그래프 출력
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const monthData = dates.filter(d => d.startsWith(currentMonth));
+      const chartLabels = monthData;
+      const chartData = monthData.map(d => data[d]);
+
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: chartLabels,
+          datasets: [{
+            label: '감정 점수',
+            data: chartData,
+            backgroundColor: '#90caf9'
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              suggestedMin: 0,
+              suggestedMax: 10
+            }
+          }
+        }
+      });
+    }
+
+    function resetData() {
+      if (confirm("정말 초기화할까요? 모든 기록이 삭제됩니다.")) {
+        localStorage.removeItem("emotionData");
+        updateStats({});
+      }
+    }
+
+    window.onload = () => {
+      const data = JSON.parse(localStorage.getItem("emotionData")) || {};
+      updateStats(data);
+    };
+  </script>
+</body>
+</html>
